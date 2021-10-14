@@ -12,6 +12,8 @@ use Magento\Cron\Model\DeadlockRetrierInterface;
 use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\DB\Adapter\DeadlockException;
+use PHPUnit\Framework\MockObject\MockObject;
+use Psr\Log\LoggerInterface;
 
 class DeadlockRetrierTest extends \PHPUnit\Framework\TestCase
 {
@@ -22,12 +24,17 @@ class DeadlockRetrierTest extends \PHPUnit\Framework\TestCase
     private $retrier;
 
     /**
-     * @var AdapterInterface|\PHPUnit\Framework\MockObject\MockObject
+     * @var AdapterInterface|MockObject
      */
     private $adapterMock;
 
     /**
-     * @var AbstractModel|\PHPUnit\Framework\MockObject\MockObject
+     * @var LoggerInterface|MockObject
+     */
+    private $loggerMock;
+
+    /**
+     * @var AbstractModel|MockObject
      */
     private $modelMock;
 
@@ -37,8 +44,9 @@ class DeadlockRetrierTest extends \PHPUnit\Framework\TestCase
     protected function setUp(): void
     {
         $this->adapterMock = $this->getMockForAbstractClass(AdapterInterface::class);
+        $this->loggerMock = $this->getMockForAbstractClass(LoggerInterface::class);
         $this->modelMock = $this->createMock(AbstractModel::class);
-        $this->retrier = new DeadlockRetrier();
+        $this->retrier = new DeadlockRetrier($this->loggerMock);
     }
 
     /**
@@ -74,6 +82,8 @@ class DeadlockRetrierTest extends \PHPUnit\Framework\TestCase
         $this->modelMock->expects($this->exactly(DeadlockRetrierInterface::MAX_RETRIES))
             ->method('getId')
             ->willThrowException(new DeadlockException());
+        $this->loggerMock->expects($this->exactly(DeadlockRetrierInterface::MAX_RETRIES - 1))
+            ->method('warning');
 
         $this->retrier->execute(
             function () {
@@ -94,6 +104,8 @@ class DeadlockRetrierTest extends \PHPUnit\Framework\TestCase
         $this->modelMock->expects($this->at(1))
             ->method('getId')
             ->willReturn(2);
+        $this->loggerMock->expects($this->once())
+            ->method('warning');
 
         $this->retrier->execute(
             function () {
